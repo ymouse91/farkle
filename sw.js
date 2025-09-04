@@ -1,5 +1,5 @@
 /* sw.js – Farkle PWA */
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.0.1';
 const APP_CACHE = `farkle-${CACHE_VERSION}`;
 
 const APP_SHELL = [
