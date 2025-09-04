@@ -3,7 +3,7 @@ const CACHE_VERSION = 'v1.0.0';
 const APP_CACHE = `farkle-${CACHE_VERSION}`;
 
 const APP_SHELL = [
-  './farkle.html',
+  './index.html',
   './manifest.webmanifest',
   './offline.html',
   './icons/icon-192.png',

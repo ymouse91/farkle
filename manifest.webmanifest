@@ -2,7 +2,7 @@
   "name": "Farkle – Pistelaskuri",
   "short_name": "Farkle",
   "lang": "fi",
-  "start_url": "farkle.html",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
