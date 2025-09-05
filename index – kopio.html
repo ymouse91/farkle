@@ -16,8 +16,15 @@
 
   <!--
     Farkle pistelaskuri (kompakti, mobiiliin sopiva)
-    - Vuorossa olevan pelaajan nimi otsikon oikealla
-    - Scorelistan pisteet tasattu oikealle, kiinteä leveys → alkavat samasta kohdasta
+    - Selite ylhäällä, pistearvo pienempänä napissa
+    - Värikoodatut napit ryhmille (yksittäiset/kaksikot/kolmoset/…)
+    - Ei yhdistelmänappeja, jotka voi muodostaa perusnapeista
+    - Nopparaja: valittujen noppien yhteismäärä ei saa ylittää 6
+    - Moninpeli: vuoro ei vaihdu automaattisesti, valitse aktiivinen pelaaja klikkaamalla hänen riviään
+    - Yksinpeli: 1000p “sisään” -sääntö pois
+    - Moninpeli: 1000p “sisään” edelleen käytössä (kvali-merkintä)
+    - Bust: vähentää kuluvan vuoron aikana lisätyt pisteet (turnAcc) aktiiviselta pelaajalta
+    - Undo (ⓧ pelaajarivissä): poistaa viimeisimmän lisäyksen valitulta pelaajalta
   -->
   <style>
     /* --- Perustyylit ja layout --- */
@@ -30,15 +37,9 @@
       max-width: 420px; margin: 0 auto; background: #fff; border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,.05); overflow: hidden; border: 1px solid #e5e7eb;
     }
-
-    /* Header: Farkle vasemmalla, vuorossa oleva nimi oikealla */
     .header { background: #fff; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
-    .header h1 {
-      font-size: 20px; font-weight: 900;
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    }
+    .header h1 { font-size: 20px; font-weight: 900; }
     .header h1 button { all: unset; cursor: pointer; }
-    .current-name { font-size: 16px; font-weight: 700; color: #111; }
 
     .content { padding: 10px; }
 
@@ -84,26 +85,12 @@
     /* --- Scoreboard --- */
     .scoreboard { margin-top: 6px; }
     .player-score {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; justify-content: space-between; align-items: center;
       padding: 5px 6px; background: #f7f7f7; border: 1px solid #e5e7eb; border-radius: 6px;
       margin-bottom: 4px; font-size: 13px; font-weight: 700;
     }
     .player-score.current { outline: 2px solid #111; }
     .player-score.winner { background: #0a7c66; color: #fff; border-color: #0a7c66; }
-
-    /* Nimi vasemmalle, pisteet kiinteälle palstalle oikealle */
-    .player-score .name {
-      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .player-score .score {
-      /* Kiinteä leveys + oikea tasaus → numerot loppuvat samaan kohtaan juuri ennen Undo-nappia */
-      flex: 0 0 64px; text-align: right; margin-right: 4px;
-      tab-size: 2;  /* varmistaa ettei monospacea tarvita */
-    }
-    .player-score .undo-btn {
-      border: none; background: transparent; font-size: 16px; line-height: 1; cursor: pointer;
-    }
-
     .winner-announcement { text-align: center; padding: 8px; background: #0a7c66; color: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 14px; }
 
     /* --- Ohje --- */
@@ -116,11 +103,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <!-- Farkle vasemmalla, vuorossa oleva nimi oikealla -->
-      <h1>
-        <button id="titleBtn">🎲 Farkle</button>
-        <span id="currentPlayerName" class="current-name"></span>
-      </h1>
+      <h1><button id="titleBtn">🎲 Farkle</button></h1>
     </div>
 
     <div class="content">
@@ -272,7 +255,7 @@
       // Yksinpeli: kvalisääntö pois ja valitaan pelaaja automaattisesti
       if (players.length === 1) { players[0].qualified = true; }
 
-      // Moninpeli: valitaan ensimmäinen pelaaja aloituksessa,
+      // Moninpelissä valitaan ensimmäinen pelaaja aloituksessa,
       // jotta pisteiden lisääminen toimii heti.
       currentPlayerIndex = 0;
       players.forEach(p => p.turnAcc = 0);
@@ -339,7 +322,7 @@
         p.turnAcc += currentTurnScore;
         if (p.score >= 10000) { gameWinner = p; showWinner(); return; }
       } else {
-        // Moninpeli: 1000p sisään (aloituskynnys 500 kuten aiemmin)
+        // Moninpeli: 1000p sisään (tässä käytössä 500 pisteen kynnys aloitushetkeen – säilytin logiikan)
         if (!p.qualified && p.score + currentTurnScore >= 500) p.qualified = true;
         if (p.qualified || p.score + currentTurnScore >= 500) {
           p.score += currentTurnScore;
@@ -402,7 +385,6 @@
       document.querySelectorAll('.score-btn').forEach(b => b.classList.remove('selected'));
       currentTurnScore = 0; selectedScores = [];
       document.getElementById('playerNameInput').focus();
-      updateScoreboard(); // tyhjennä myös otsikon nimi
     };
 
     // --- Scoreboardin päivitys ---
@@ -421,25 +403,15 @@
         const qualified = solo ? '' : ((p.qualified || p.score >= 1000) ? ' ✓' : ' ⭕');
         return `
           <div class="${cls}" onclick="selectPlayer(${i})">
-            <span class="name">${p.name}${qualified}</span>
-            <span class="score">${p.score}</span>
+            <span>${p.name}${qualified}</span>
+            <span>${p.score}</span>
             <button
-              class="undo-btn"
               onclick="undoLast(${i});event.stopPropagation();"
               title="Peru viimeisin lisäys"
+              style="margin-left:6px;border:none;background:transparent;font-size:16px;line-height:1"
             >ⓧ</button>
           </div>`;
       }).join('');
-
-      // Päivitä otsikon oikea laita: vuorossa oleva pelaaja
-      const nameBox = document.getElementById('currentPlayerName');
-      if (nameBox) {
-        if (currentPlayerIndex >= 0 && players[currentPlayerIndex]) {
-          nameBox.textContent = players[currentPlayerIndex].name;
-        } else {
-          nameBox.textContent = '';
-        }
-      }
     }
 
     // --- Voittajan näyttö ---
