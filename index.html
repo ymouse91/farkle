@@ -434,7 +434,7 @@
         const qualified = solo ? '' : ((p.qualified || p.score >= 1000) ? ' ✓' : ' ⭕');
         return `
           <div class="${cls}" onclick="selectPlayer(${i})">
-            <span class="name">${p.name}${qualified}</span>
+            <span class="name">${qualified}${p.name}</span>
             <span class="score">${p.score}</span>
             <button
               class="undo-btn"
