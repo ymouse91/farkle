@@ -10,17 +10,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-
-  <!-- PWA: manifest -->
   <link rel="manifest" href="manifest.webmanifest" />
 
-  <!--
-    Farkle pistelaskuri (kompakti, mobiiliin sopiva)
-    - Vuorossa olevan pelaajan nimi otsikon oikealla
-    - Scorelistan pisteet tasattu oikealle, kiinteä leveys → alkavat samasta kohdasta
-  -->
   <style>
-    /* --- Perustyylit ja layout --- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -42,12 +34,16 @@
 
     .content { padding: 10px; }
 
-    /* --- Pelaaja-asetukset (alkunäkymä) --- */
+    /* Pelaaja-asetukset */
     .player-setup { text-align: center; }
-    .player-setup h2 { font-size: 15px; margin-bottom: 6px; }
+    .player-setup h2 { font-size: 15px; margin-bottom: 8px; }
     .input-group { margin-bottom: 6px; }
     .input-group input {
       width: 100%; padding: 8px; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 15px;
+    }
+    .toggle {
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      font-size:14px; margin:8px 0 10px;
     }
     .btn {
       width: 100%; padding: 8px; border: none; border-radius: 8px; font-weight: 700;
@@ -58,7 +54,7 @@
     .btn-success { background: #0a7c66; color: #fff; }
     .btn-danger { background: #b6372f; color: #fff; }
 
-    /* --- Pistenapit --- */
+    /* Pistenapit */
     .score-input { background: #f7f7f7; padding: 8px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e5e7eb; }
     .score-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
     .score-btn {
@@ -71,17 +67,17 @@
     .score-btn:active { transform: translateY(1px); }
     .score-btn.selected { outline: 2px solid #111; outline-offset: 1px; }
 
-    /* --- Värikoodit ryhmille --- */
+    /* Värikoodit */
     .g1{ background:#e6f3ff }   /* yksittäiset */
     .g2{ background:#f0fff0 }   /* kaksikot */
     .g3{ background:#fff7e6 }   /* kolmoset */
     .g5{ background:#f9e6ff }   /* 4–6 samaa */
     .g6{ background:#e6fffb }   /* erikoiset */
 
-    /* --- Toiminnot --- */
+    /* Toiminnot */
     .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
 
-    /* --- Scoreboard --- */
+    /* Scoreboard */
     .scoreboard { margin-top: 6px; }
     .player-score {
       display: flex; align-items: center; gap: 6px;
@@ -91,27 +87,26 @@
     .player-score.current { outline: 2px solid #111; }
     .player-score.winner { background: #0a7c66; color: #fff; border-color: #0a7c66; }
 
-    /* Nimi vasemmalle, pisteet kiinteälle palstalle oikealle */
     .player-score .name {
       flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .player-score .score {
-      /* Kiinteä leveys + oikea tasaus → numerot loppuvat samaan kohtaan juuri ennen Undo-nappia */
       flex: 0 0 64px; text-align: right; margin-right: 4px;
-      tab-size: 2;  /* varmistaa ettei monospacea tarvita */
     }
     .player-score .undo-btn {
       border: none; background: transparent; font-size: 16px; line-height: 1; cursor: pointer;
+      font-weight: bold; color: #b6372f;
     }
+    .player-score .undo-btn:hover { color: #8c1f1a; }
 
     .winner-announcement { text-align: center; padding: 8px; background: #0a7c66; color: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 14px; }
 
-    /* --- Ohje --- */
+    /* Ohje */
     #scoreHelp {
       display: none; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
       padding: 8px; margin: 6px 0; font-size: 12px; line-height: 1.3;
     }
-	.player-score .undo-btn {
+		.player-score .undo-btn {
   border: none;
   background: transparent;
   font-size: 16px;
@@ -123,13 +118,12 @@
 .player-score .undo-btn:hover {
   color: #8c1f1a;  /* tummempi punainen */
 }
-
+					  
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <!-- Farkle vasemmalla, vuorossa oleva nimi oikealla -->
       <h1>
         <button id="titleBtn">🎲 Farkle</button>
         <span id="currentPlayerName" class="current-name"></span>
@@ -145,6 +139,13 @@
         </div>
         <button class="btn btn-primary" onclick="addPlayer()">Lisää pelaaja</button>
         <div id="playerList" style="margin-top:6px;"></div>
+
+        <!-- UUSI: Avauskynnys 300p ruksi -->
+        <label class="toggle">
+          <input type="checkbox" id="openingToggle">
+          <span>Avauskynnys 300p</span>
+        </label>
+
         <button id="startGameBtn" class="btn btn-secondary" onclick="startGame()" style="display:none;">Aloita peli</button>
       </div>
 
@@ -240,12 +241,14 @@
 
   <script>
     // --- Sovelluksen tila ---
-    // players: { name, score, qualified, history[], turnAcc }
-    let players = [];
-    let currentPlayerIndex = -1;          // moninpelissä -1 = ei valittua pelaajaa alussa
-    let currentTurnScore = 0;             // valittujen nappien summa (tähän heittoon)
-    let selectedScores = [];              // valittujen nappien pisteet listana
-    let gameWinner = null;                // {name, ...} kun score >= 10000
+    let players = [];                    // { name, score, qualified, history[], turnAcc }
+    let currentPlayerIndex = -1;         // moninpelissä -1 = ei valittua pelaajaa alussa
+    let currentTurnScore = 0;
+    let selectedScores = [];
+    let gameWinner = null;
+
+    // Avauskynnys (300p) päällä/pois – luetaan startGame:ssa checkboxista
+    let openingRuleEnabled = false;      // false = ei kynnystä, true = vaatii >=300p “sisään”
 
     // --- Pelaajien lisääminen ---
     window.addPlayer = function () {
@@ -260,17 +263,14 @@
         document.querySelector('.btn-primary').style.display = 'none';
         return;
       }
-
       if (players.some(p => p.name === name)) { alert('Pelaaja on jo lisätty!'); return; }
 
-      // Uusi pelaaja
       players.push({ name, score: 0, qualified: false, history: [], turnAcc: 0 });
       updatePlayerList();
       input.value = '';
       input.focus();
     };
 
-    // Päivitä pelaajalista lähtönäkymässä
     function updatePlayerList() {
       const list = document.getElementById('playerList');
       list.innerHTML = players
@@ -282,13 +282,19 @@
     window.startGame = function () {
       if (players.length < 1) { alert('Tarvitset vähintään 1 pelaajan!'); return; }
 
-      // Yksinpeli: kvalisääntö pois ja valitaan pelaaja automaattisesti
-      if (players.length === 1) { players[0].qualified = true; }
+      // Lue ruksi (avauskynnys 300p)
+      openingRuleEnabled = !!document.getElementById('openingToggle').checked;
 
-      // Moninpeli: valitaan ensimmäinen pelaaja aloituksessa,
-      // jotta pisteiden lisääminen toimii heti.
+      // Yksinpeli: ei kynnystä
+      if (players.length === 1) {
+        players[0].qualified = true;
+      } else {
+        // Moninpeli: jos kynnystä EI ole, kaikki ovat heti sisällä
+        players.forEach(p => { p.turnAcc = 0; p.qualified = !openingRuleEnabled; });
+      }
+
+      // Valitse ensimmäinen pelaaja
       currentPlayerIndex = 0;
-      players.forEach(p => p.turnAcc = 0);
 
       document.getElementById('playerSetup').style.display = 'none';
       document.getElementById('gameArea').style.display = 'block';
@@ -297,7 +303,7 @@
       setupScoreButtons();
     };
 
-    // --- Pistenappien klikkauksen käsittely ---
+    // --- Pistenapit ---
     function setupScoreButtons() {
       document.querySelectorAll('.score-btn').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -307,7 +313,6 @@
       });
     }
 
-    // Toggle-valinta + nopparaja 6
     function toggleScoreSelection(button, score) {
       if (button.classList.contains('selected')) {
         button.classList.remove('selected');
@@ -318,12 +323,10 @@
         selectedScores.push(score);
       }
 
-      // Lasketaan valittujen noppien määrä data-dice -attribuutista
       const totalDice = Array.from(document.querySelectorAll('.score-btn.selected'))
         .reduce((sum, el) => sum + (parseInt(el.dataset.dice, 10) || 0), 0);
       const warn = document.getElementById('diceWarning');
 
-      // Jos yli 6 noppaa -> perutaan viimeisin valinta
       if (totalDice > 6) {
         button.classList.remove('selected');
         const i = selectedScores.indexOf(score);
@@ -334,27 +337,41 @@
         warn.style.display = 'none';
       }
 
-      // Päivitä vuoron valittujen pisteiden summa
       currentTurnScore = selectedScores.reduce((s, v) => s + v, 0);
     }
 
-    // --- Pisteiden lisääminen aktiiviselle pelaajalle ---
+    // --- Pisteiden lisääminen ---
     window.addToScore = function () {
       if (!currentTurnScore) { alert('Valitse ensin pisteet!'); return; }
       if (players.length > 1 && currentPlayerIndex < 0) { alert('Valitse pelaaja taulukosta.'); return; }
 
       const p = players[currentPlayerIndex >= 0 ? currentPlayerIndex : 0];
 
-      // Yksinpeli: ei kvalisääntöä
       if (players.length === 1) {
+        // Yksinpeli: ei kynnystä
         p.score += currentTurnScore;
         p.history.push(currentTurnScore);
         p.turnAcc += currentTurnScore;
         if (p.score >= 10000) { gameWinner = p; showWinner(); return; }
+
       } else {
-        // Moninpeli: 1000p sisään (aloituskynnys 500 kuten aiemmin)
-        if (!p.qualified && p.score + currentTurnScore >= 500) p.qualified = true;
-        if (p.qualified || p.score + currentTurnScore >= 500) {
+        // Moninpeli
+        if (openingRuleEnabled) {
+          // Kynnys päällä: vaaditaan >= 300p ensimmäiseen hyväksyttyyn lisäykseen
+          if (!p.qualified && (p.score + currentTurnScore >= 300)) {
+            p.qualified = true;
+          }
+          if (p.qualified || (p.score + currentTurnScore >= 300)) {
+            p.score += currentTurnScore;
+            p.history.push(currentTurnScore);
+            p.turnAcc += currentTurnScore;
+            if (p.score >= 10000) { gameWinner = p; showWinner(); return; }
+          } else {
+            alert('Avauskynnys 300p ei vielä täyty.');
+          }
+        } else {
+          // Ei kynnystä: suoraan sisään
+          p.qualified = true;
           p.score += currentTurnScore;
           p.history.push(currentTurnScore);
           p.turnAcc += currentTurnScore;
@@ -362,36 +379,41 @@
         }
       }
 
-      // Tyhjennä kuluvan heiton valinnat
       currentTurnScore = 0;
       selectedScores = [];
       document.querySelectorAll('.score-btn').forEach(b => b.classList.remove('selected'));
       updateScoreboard();
     };
 
-    // --- Bust: menetetään kuluvan vuoron kertymä (turnAcc) ---
+    // --- Bust ---
     window.bustTurn = function () {
       if (currentPlayerIndex >= 0) {
         const p = players[currentPlayerIndex];
         const lose = p.turnAcc || 0;
         if (lose > 0) {
-          p.score -= lose;           // vähennä vuorokertymä pisteistä
-          p.history.push(-lose);     // kirjaa negatiivinen merkintä historiaan
-          p.turnAcc = 0;             // nollaa vuorokertymä
-          // päivitys kvaliin (yksinpelissä aina true)
-          p.qualified = (players.length === 1) || (p.score >= 1000);
+          p.score -= lose;
+          p.history.push(-lose);
+          p.turnAcc = 0;
+          // Qualified-status:
+          // - Yksinpeli tai kynnys pois: aina true
+          // - Kynnys päällä: ei muuteta statusta bustissa
+          if (players.length === 1 || !openingRuleEnabled) {
+            p.qualified = true;
+          }
         }
       }
-      // Nollaa tämän heiton tilat
       currentTurnScore = 0;
       selectedScores = [];
       document.querySelectorAll('.score-btn').forEach(b => b.classList.remove('selected'));
       updateScoreboard();
     };
 
-    // --- Uusi kierros (nollaa pisteet, säilyttää pelaajat) ---
+    // --- Uusi kierros ---
     window.newRound = function () {
-      players.forEach(p => { p.score = 0; p.history = []; p.turnAcc = 0; p.qualified = (players.length === 1); });
+      players.forEach(p => {
+        p.score = 0; p.history = []; p.turnAcc = 0;
+        p.qualified = (players.length === 1 || !openingRuleEnabled);
+      });
       currentPlayerIndex = (players.length >= 1 ? 0 : -1);
       currentTurnScore = 0; selectedScores = []; gameWinner = null;
       document.getElementById('winnerArea').style.display = 'none';
@@ -400,7 +422,7 @@
       updateScoreboard();
     };
 
-    // --- Uusi peli (tyhjentää kaiken) ---
+    // --- Uusi peli ---
     window.newGame = function () {
       players = []; currentPlayerIndex = -1; currentTurnScore = 0; selectedScores = []; gameWinner = null;
       document.getElementById('gameArea').style.display = 'none';
@@ -415,7 +437,7 @@
       document.querySelectorAll('.score-btn').forEach(b => b.classList.remove('selected'));
       currentTurnScore = 0; selectedScores = [];
       document.getElementById('playerNameInput').focus();
-      updateScoreboard(); // tyhjennä myös otsikon nimi
+      updateScoreboard();
     };
 
     // --- Scoreboardin päivitys ---
@@ -423,28 +445,26 @@
       const list = document.getElementById('scoreList');
       const solo = (players.length === 1);
       const hint = document.getElementById('turnHint');
-
-      // Näytä vihje, jos moninpelissä kukaan ei ole valittuna
       if (hint) hint.style.display = (!solo && currentPlayerIndex < 0) ? 'block' : 'none';
 
       list.innerHTML = players.map((p, i) => {
         let cls = 'player-score';
         if (!gameWinner && i === currentPlayerIndex) cls += ' current';
         if (gameWinner && p === gameWinner) cls += ' winner';
-        const qualified = solo ? '' : ((p.qualified || p.score >= 1000) ? ' ✓' : ' ⭕');
+        // ✓ näkyy aina, jos ei ole kynnystä tai on yksinpeli — muuten vain kun on qualified
+        const showTick = solo || !openingRuleEnabled || p.qualified;
+        const qualified = showTick ? ' ✓' : ' ⭕';
         return `
           <div class="${cls}" onclick="selectPlayer(${i})">
-            <span class="name">${qualified}${p.name}</span>
+            <span class="name">${p.name}${qualified}</span>
             <span class="score">${p.score}</span>
-            <button
-              class="undo-btn"
+            <button class="undo-btn"
               onclick="undoLast(${i});event.stopPropagation();"
-              title="Peru viimeisin lisäys"
-            >ⓧ</button>
+              title="Peru viimeisin lisäys">ⓧ</button>
           </div>`;
       }).join('');
 
-      // Päivitä otsikon oikea laita: vuorossa oleva pelaaja
+      // Otsikon oikea laita: vuorossa oleva nimi
       const nameBox = document.getElementById('currentPlayerName');
       if (nameBox) {
         if (currentPlayerIndex >= 0 && players[currentPlayerIndex]) {
@@ -463,59 +483,46 @@
       updateScoreboard();
     }
 
-    // --- Pelaajan valinta (moninpeli) ---
+    // --- Pelaajan valinta ---
     window.selectPlayer = function (i) {
       currentPlayerIndex = (players.length === 1 ? 0 : i);
       if (currentPlayerIndex >= 0) {
-        // Tuore vuoro valitulle pelaajalle
         players[currentPlayerIndex].turnAcc = 0;
       }
       updateScoreboard();
     };
 
-    // --- Peru viimeisin lisäys pelaajalta ---
+    // --- Undo ---
     window.undoLast = function (i) {
       const p = players[i];
       if (!p || !p.history || !p.history.length) return;
-      const last = p.history.pop();               // poista viimeisin merkintä (voi olla myös negatiivinen)
+      const last = p.history.pop();
       p.score = p.history.reduce((a, b) => a + b, 0);
-
-      // Jos perutaan aktiivisen pelaajan tämän vuoron lisäys, korjaa turnAcc
       if (i === currentPlayerIndex && last > 0) {
         p.turnAcc = Math.max(0, (p.turnAcc || 0) - last);
       }
-      // Päivitä kvali
-      p.qualified = (players.length === 1) || (p.score >= 1000);
-
+      // Qualified:
+      if (players.length === 1 || !openingRuleEnabled) {
+        p.qualified = true;
+      }
       updateScoreboard();
     };
 
-    // --- Boot: UI-kytkennät ja pienet testit ---
+    // --- Boot ---
     document.addEventListener('DOMContentLoaded', () => {
-      // Otsikon napista ohje auki/kiinni
       document.getElementById('titleBtn').addEventListener('click', () => {
         const h = document.getElementById('scoreHelp');
         h.style.display = (h.style.display === 'none' || !h.style.display) ? 'block' : 'none';
       });
 
-      // Enter lisää pelaajan syöttökentästä
       const inp = document.getElementById('playerNameInput');
       inp.addEventListener('keypress', e => { if (e.key === 'Enter') addPlayer(); });
       inp.focus();
 
-      // PWA: rekisteröi service worker
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js');
         });
-      }
-
-      // Smoke-testit (kehittäjälle konsoliin)
-      try {
-        console.assert(typeof window.addPlayer === 'function', 'addPlayer should be defined');
-        console.assert(document.querySelectorAll('.score-btn').length === 15, 'Should render 15 score buttons');
-      } catch (e) {
-        console.warn('Smoke test failed', e);
       }
     });
   </script>
